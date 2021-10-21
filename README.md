@@ -14,6 +14,6 @@ As each pixel of the image stores RGB values for colour, it is easier if we unif
 
 ### For each go across all columns and find the first white pixel.
 ![Alt text](examples/example3.png?raw=true "T1 Slice")
+![Alt text](examples/example4.png?raw=true "T1 Slice")
 
 To achieve the above the same process of finding the first white pixel must be replicated on the image data by traversing the matrix as if moving up, down, left, and right across the image. With the colour settings back to normal the surface can be seen clearer.
-![Alt text](examples/example4.png?raw=true "T1 Slice")
