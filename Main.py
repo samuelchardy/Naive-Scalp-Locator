@@ -22,11 +22,10 @@ def findNearest(data, value):
 
 
 def makeImageBlackAndWhite(data):
-    dataBW = data.copy()
-    meanOfDat = np.mean(dataBW)
-    dataBW[np.where(dataBW < meanOfDat)] = 0
-    dataBW[np.where(dataBW > meanOfDat)] = 255
-    return dataBW
+    skullCol = findSkullColour(data)
+    data[np.where(data < skullCol)] = 0
+    data[np.where(data > skullCol)] = 255
+    return data
 
 
 
@@ -49,7 +48,7 @@ def detectSide(data, dir, view, sliceNum):
             if dir == "up" or dir == "down":
                 row = j
                 col = i           
-            if (dataBW[row, col, 0] > 140):
+            if (data[row, col, 0] > 140):
                 if (reachedSurf is False):
                     data[row, col, :] = [255, 0, 0]
                     reachedSurf = True
@@ -86,30 +85,18 @@ def makeSlices(data, invRes=1):
                 if surfVal.shape[0] > 0:
                     surfVals = np.vstack((surfVals, surfVal))
 
-            # im = Image.fromarray(np.uint8(dat))
-            # im.save(f"{j}-{i}.png")
+            im = Image.fromarray(np.uint8(dat))
+            im.save(f"{j}-{i}.png")
             bar.next()
+
+    surfVals = np.delete(surfVals, [0], 0)
     bar.finish()
     return surfVals
 
 
 
 def outputSurface(data):
-
     surf = ConvexHull(data)
-
-    # cloud = pv.PolyData(data)
-    # surf = cloud.delaunay_3d()
-    # #print(surf.cells.shape)
-
-    # surf.plot(show_edges=True)
-    # print(cloud.array_names)
-    # print(surf.array_names)
-    #print(surf.extract_all_edges().points)
-    #edges = surf.cells.reshape((505294,3))
-    # edges = surf.extract_all_edges().points
-    #print(edges.shape)
-
     write_surface("outer_skin.surf", surf.points, surf.simplices, overwrite=True, file_format="freesurfer")
 
 
@@ -135,10 +122,19 @@ def outlierRemoval(data):
 
 
 
+def findSkullColour(data):
+    slice0Mid = np.mean(data[120, :, :])
+    slice1Mid = np.mean(data[:, 120, :])
+
+    col = np.mean([slice0Mid, slice1Mid])
+    return col
+
+
 def generateSurface(subjectID, invRes=1):
     plot = nib.load(f"../subjects/{subjectID}/mri/T1.mgz")
     imgData = plot.get_fdata()
 
+    imgData = makeImageBlackAndWhite(imgData, )
     startTime = time.time()
     surfacePoints = makeSlices(imgData, invRes)
     surfacePoints = outlierRemoval(surfacePoints)
@@ -147,6 +143,9 @@ def generateSurface(subjectID, invRes=1):
     surfacePoints[:,2] = surfacePoints[:,2]-128
     surfacePoints[:,1], surfacePoints[:,2] = surfacePoints[:,2], surfacePoints[:,1].copy()
     surfacePoints[:,2] = surfacePoints[:,2]*-1
+    pl = pv.Plotter()
+    _ = pl.add_points(surfacePoints, render_points_as_spheres=True, color='w', point_size=10)
+    pl.show()
     outputSurface(surfacePoints)
     print(f"Time: {time.time()-startTime}")
 
@@ -156,23 +155,7 @@ def generateSurface(subjectID, invRes=1):
 
 
 subjectID = sys.argv[1]
-generateSurface(subjectID, invRes=25)
+generateSurface(subjectID, invRes=15)
 
 
 
-
-
-
-#im = Image.fromarray(np.uint8(dat))
-#im.save(f"{i}.png")
-
-# im = Image.fromarray(slice_0)
-# im.save("images/test.png", "png")
-
-# test = fig2img(plot)
-# test.save(f"images/test.png")
-
-# test = fig2data(plot)
-
-# print(test)
-# plot.savefig(f"images/test.png")
