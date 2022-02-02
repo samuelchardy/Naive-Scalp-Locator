@@ -10,6 +10,9 @@ import pyvista as pv
 from mne import write_surface
 from scipy.spatial import ConvexHull
 
+from sklearn.cluster import KMeans
+from sklearn.neighbors import LocalOutlierFactor
+
 from progress.bar import ChargingBar
 
 
@@ -98,7 +101,7 @@ def makeSlices(data, invRes=1):
 def outputSurface(data):
     surf = ConvexHull(data)
     write_surface("outer_skin.surf", surf.points, surf.simplices, overwrite=True, file_format="freesurfer")
-
+    
 
 
 def outlierRemoval(data):
@@ -121,6 +124,22 @@ def outlierRemoval(data):
     return data
 
 
+def localOutlierRemoval(data):
+    bar = ChargingBar(f"Local Outlier Factor Calcuation", max=3)
+    clf = LocalOutlierFactor(n_neighbors=500)
+    clf.fit_predict(data)
+    
+    bar.next()
+    outlierFactor = clf.negative_outlier_factor_      
+    outlierFactor[np.where(outlierFactor<np.mean(outlierFactor)-3*np.std(outlierFactor))[0]] = 1
+    outlierFactor[np.where(outlierFactor != 1)[0]] = 0
+
+    bar.next()
+    data = data[np.where(outlierFactor==0)[0]]
+    bar.next()
+    bar.finish()
+    return outlierFactor.astype(int)
+
 
 def findSkullColour(data):
     slice0Mid = np.mean(data[120, :, :])
@@ -131,23 +150,32 @@ def findSkullColour(data):
 
 
 def generateSurface(subjectID, invRes=1):
-    plot = nib.load(f"../subjects/{subjectID}/mri/T1.mgz")
+    plot = nib.load(f"../../subjects/{subjectID}/mri/T1.mgz")
     imgData = plot.get_fdata()
 
     imgData = makeImageBlackAndWhite(imgData, )
     startTime = time.time()
     surfacePoints = makeSlices(imgData, invRes)
-    surfacePoints = outlierRemoval(surfacePoints)
+    # surfacePoints = outlierRemoval(surfacePoints)
+    labels = localOutlierRemoval(surfacePoints)
     surfacePoints[:,0] = surfacePoints[:,0]-124
     surfacePoints[:,1] = surfacePoints[:,1]-128
     surfacePoints[:,2] = surfacePoints[:,2]-128
     surfacePoints[:,1], surfacePoints[:,2] = surfacePoints[:,2], surfacePoints[:,1].copy()
     surfacePoints[:,2] = surfacePoints[:,2]*-1
+
+    print(f"Time: {time.time()-startTime}")
+
+    colors = ['black', 'blue', 'yellow', 'grey', 'red']
     pl = pv.Plotter()
-    _ = pl.add_points(surfacePoints, render_points_as_spheres=True, color='w', point_size=10)
+    for i in np.unique(labels):
+        points = surfacePoints[np.where(labels==i)[0]]
+        #print(points.shape)
+        _ = pl.add_points(points, render_points_as_spheres=True, color=colors[i], point_size=10)
     pl.show()
     outputSurface(surfacePoints)
-    print(f"Time: {time.time()-startTime}")
+    # print(surfacePoints[0, :])
+
 
 
 
